@@ -306,6 +306,8 @@ class ContextAwarenessEngine:
 class MultimodalSentimentAnalyzer:
     def __init__(self):
         # Initialize NLTK sentiment analyzer for text
+        import nltk
+        nltk.download('vader_lexicon')
         self.text_analyzer = SentimentIntensityAnalyzer()
         self.sentiment_cache = {}
         
