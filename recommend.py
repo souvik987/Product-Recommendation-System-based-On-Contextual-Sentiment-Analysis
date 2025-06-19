@@ -15,6 +15,9 @@ import logging
 import warnings
 import os
 import random
+from PIL import Image
+from transformers import CLIPProcessor, CLIPModel
+
 warnings.filterwarnings('ignore')
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -317,6 +320,9 @@ class MultimodalSentimentAnalyzer:
         
         # Track sentiment history
         self.sentiment_history = defaultdict(list)
+
+        self.clip_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32")
+        self.clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
         
     def enable_image_analysis(self, api_key=None):
         """Enable image analysis with optional API key"""
@@ -326,6 +332,26 @@ class MultimodalSentimentAnalyzer:
             logger.info("Image sentiment analysis enabled")
         else:
             logger.warning("No API key provided for image analysis")
+
+    def extract_labels_from_image(self, image_path, candidate_labels=None):
+        """Extract top matching labels from the uploaded image using CLIP"""
+        if not candidate_labels:
+            candidate_labels = [
+                "shirt", "jeans", "shoes", "dress", "phone", "laptop", "bag", 
+                "headphones", "watch", "t-shirt", "jacket", "sunglasses", "toy"
+            ]
+
+        image = Image.open(image_path).convert("RGB")
+        inputs = self.clip_processor(text=candidate_labels, images=image, return_tensors="pt", padding=True)
+        outputs = self.clip_model(**inputs)
+        logits_per_image = outputs.logits_per_image  # similarity scores
+        probs = logits_per_image.softmax(dim=1).detach().numpy()[0]
+
+        label_scores = list(zip(candidate_labels, probs))
+        label_scores.sort(key=lambda x: x[1], reverse=True)
+
+        top_labels = [label for label, score in label_scores[:3]]  # Top 3 labels
+        return top_labels
     
     def enable_voice_analysis(self, api_key=None):
         """Enable voice analysis with optional API key"""
@@ -351,8 +377,6 @@ class MultimodalSentimentAnalyzer:
     
     def _mock_image_analysis(self, image_path):
         """Mock implementation of image sentiment analysis"""
-        # In a real implementation, this would call a computer vision API
-        # This mock version returns random values for demonstration
         return {
             'joy': round(random.random(), 2),
             'sadness': round(random.random() * 0.5, 2),
@@ -931,6 +955,14 @@ class EnhancedRecommendationSystem:
             return None
             
         recommendations = basic_results['recommendations']
+
+        if user_image and os.path.exists(user_image):
+            image_labels = self.sentiment_analyzer.extract_labels_from_image(user_image)
+            recommendations = recommendations[
+                recommendations['product_name'].str.contains('|'.join(image_labels), case=False, na=False) |
+                recommendations['product_category_tree'].str.contains('|'.join(image_labels), case=False, na=False)
+            ]
+
         
         # Extract latitude from weather data if available
         latitude = None
@@ -1024,7 +1056,7 @@ def test_enhanced_features():
                 print(f"Combined Sentiment: {results['sentiment_analysis']['combined_sentiment']:.2f}")
         
         print(f"\nTop 5 Recommended Products (Enhanced):")
-        top_recommendations = results['recommendations'].head(5)
+        top_recommendations = results['recommendations'].head(10)
         for i, (_, product) in enumerate(top_recommendations.iterrows(), 1):
             print(f"{i}. {product['product_name']} - Score: {product.get('final_score', 0):.2f}")
 def update_context_data():
@@ -1188,8 +1220,8 @@ recommender.load_data('flipkart_com-ecommerce_sample.csv')
 
 # Initialize context engine and sentiment analyzer
 recommender.context_engine.load_regional_preferences()
-recommender.sentiment_analyzer.enable_image_analysis("mock_key")  # Replace with actual API key in production
-recommender.sentiment_analyzer.enable_voice_analysis("mock_key")  # Replace with actual API key in production
+recommender.sentiment_analyzer.enable_image_analysis("mock_key") 
+recommender.sentiment_analyzer.enable_voice_analysis("mock_key")  
 
 # Simulate various user activities
 user_id = 'test_user'

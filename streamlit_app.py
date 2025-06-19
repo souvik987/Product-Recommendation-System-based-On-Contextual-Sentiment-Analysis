@@ -1,3 +1,4 @@
+import os
 import re
 import wave
 import streamlit as st
@@ -15,7 +16,6 @@ from PIL import Image
 import io
 import base64
 import tempfile
-import os
 import streamlit.components.v1 as components
 import queue
 import threading
@@ -1040,6 +1040,7 @@ with st.sidebar:
         type=['png', 'jpg', 'jpeg'],
         help="This helps us understand your preferences better"
     )
+
     
     st.divider()
 
@@ -1102,10 +1103,12 @@ with col1:
                 
                 # Save uploaded image temporarily if provided
                 image_path = None
-                if uploaded_image is not None:
-                    with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg') as tmp_file:
-                        tmp_file.write(uploaded_image.getvalue())
+                if uploaded_image:
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp_file:
+                        tmp_file.write(uploaded_image.read())
                         image_path = tmp_file.name
+                else:
+                    image_path = None
                 
                 try:
                     results = st.session_state.recommender.get_enhanced_recommendations(
