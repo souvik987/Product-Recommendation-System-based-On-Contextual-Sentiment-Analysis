@@ -17,6 +17,7 @@ import os
 import random
 from PIL import Image
 from transformers import CLIPProcessor, CLIPModel
+os.environ["STREAMLIT_BROWSER_GATHERUSAGESTATS"] = "false"
 
 warnings.filterwarnings('ignore')
 logging.basicConfig(level=logging.INFO)
@@ -310,7 +311,13 @@ class MultimodalSentimentAnalyzer:
     def __init__(self):
         # Initialize NLTK sentiment analyzer for text
         import nltk
-        nltk.download('vader_lexicon')
+        from nltk.sentiment import SentimentIntensityAnalyzer
+
+        try:
+            nltk.data.find('sentiment/vader_lexicon')
+        except LookupError:
+            nltk.download('vader_lexicon')
+
         self.text_analyzer = SentimentIntensityAnalyzer()
         self.sentiment_cache = {}
         
@@ -321,9 +328,9 @@ class MultimodalSentimentAnalyzer:
         # Track sentiment history
         self.sentiment_history = defaultdict(list)
 
-        self.clip_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32")
-        self.clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
-        
+        self.clip_model = None
+        self.clip_processor = None
+ 
     def enable_image_analysis(self, api_key=None):
         """Enable image analysis with optional API key"""
         if api_key:
@@ -335,6 +342,10 @@ class MultimodalSentimentAnalyzer:
 
     def extract_labels_from_image(self, image_path, candidate_labels=None):
         """Extract top matching labels from the uploaded image using CLIP"""
+        if self.clip_model is None or self.clip_processor is None:
+            self.clip_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32")
+            self.clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
+
         if not candidate_labels:
             candidate_labels = [
                 "shirt", "jeans", "shoes", "dress", "phone", "laptop", "bag", 
