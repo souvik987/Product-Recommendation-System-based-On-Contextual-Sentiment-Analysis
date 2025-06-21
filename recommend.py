@@ -35,11 +35,16 @@ class EnhancedUserActivityTracker:
         
     def track_system_metrics(self, user_id):
         """Track system-level metrics"""
+        try:
+            battery_info = psutil.sensors_battery()
+            battery_percent = battery_info.percent if battery_info else None
+        except (FileNotFoundError, AttributeError):
+            battery_percent = None
+
         metrics = {
             'cpu_usage': psutil.cpu_percent(),
             'memory_usage': psutil.virtual_memory().percent,
-            'battery': psutil.sensors_battery().percent if hasattr(psutil, 'sensors_battery') and 
-                      psutil.sensors_battery() else None,
+            'battery': battery_percent,
             'system': platform.system(),
             'browser': self.device_data.get(user_id, {}).get('browser', 'unknown')
         }
